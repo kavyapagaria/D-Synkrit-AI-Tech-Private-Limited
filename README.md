@@ -1,0 +1,1 @@
+# D-Synkrit-AI-Tech-Private-Limited

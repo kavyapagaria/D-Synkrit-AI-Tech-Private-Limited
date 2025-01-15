@@ -1,0 +1,100 @@
+import praw
+import requests
+import schedule
+import time
+import logging
+from datetime import datetime
+
+# Configure logging
+logging.basicConfig(
+    filename='reddit_bot.log', 
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+# Initialize Reddit API client
+def reddit_client():
+    try:
+        reddit = praw.Reddit(
+            client_id='**MLrtzFBlXXrnsSu46Abmug**',  # Replace with your Reddit client ID
+            client_secret='**	BjRqPdWSt2ua98vAegDPF44r98M8ew**',  # Replace with your Reddit client secret
+            username='**Typical-Success-718**',  # Replace with your Reddit username
+            password='**Kavya@25**',  # Replace with your Reddit password
+            user_agent='simple_reddit_bot by KavyaBot'  # Replace YOUR_USERNAME
+        )
+        logging.info("Reddit client initialized successfully.")
+        return reddit
+    except Exception as e:
+        logging.error(f"Error initializing Reddit client: {e}")
+        raise
+
+# Function to fetch content from Groq AI API
+def generate_content():
+    try:
+        api_url = "https://api.groq.com/v1/generate"  # Example endpoint
+        headers = {
+            'Authorization': 'Bearer **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**',  # Replace with your Groq API key
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            'prompt': "Generate a creative, engaging Reddit post about data science trends.", 
+            'max_length': 150
+        }
+        response = requests.post(api_url, headers=headers, json=payload)
+        response.raise_for_status()
+        generated_text = response.json().get('text', 'Default content in case of missing text')
+        logging.info("Content generated successfully from Groq AI.")
+        return generated_text
+    except Exception as e:
+        logging.error(f"Error generating content from Groq AI: {e}")
+        return "Unable to generate content at this time."
+
+# Function to post content to Reddit
+def post_to_reddit(reddit, subreddit_name):
+    try:
+        subreddit = reddit.subreddit(subreddit_name)
+        content = generate_content()
+        subreddit.submit(
+            title=f"Daily Post - {datetime.now().strftime('%Y-%m-%d')}",
+            selftext=content
+        )
+        logging.info(f"Post successfully made to r/{subreddit_name}.")
+    except Exception as e:
+        logging.error(f"Error posting to Reddit: {e}")
+
+# Function for simple comment generation on other posts (bonus feature)
+def comment_on_posts(reddit, subreddit_name):
+    try:
+        subreddit = reddit.subreddit(subreddit_name)
+        for submission in subreddit.hot(limit=5):  # Fetch top 5 hot posts
+            if not submission.saved:  # Avoid commenting multiple times on the same post
+                comment = generate_content()
+                submission.reply(comment)
+                submission.save()  # Mark as saved to avoid reposting
+                logging.info(f"Commented on post: {submission.title}")
+    except Exception as e:
+        logging.error(f"Error commenting on Reddit posts: {e}")
+
+# Scheduling the bot to post daily
+def schedule_posting(reddit, subreddit_name, post_time):
+    try:
+        schedule.every().day.at(post_time).do(post_to_reddit, reddit, subreddit_name)
+        logging.info(f"Scheduled daily posting at {post_time}.")
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+    except Exception as e:
+        logging.error(f"Error in scheduling: {e}")
+        raise
+
+if __name__ == "__main__":
+    try:
+        reddit = reddit_client()
+        subreddit_name = "datascience"  # Replace with your target subreddit
+        post_time = "10:00"  # Replace with your desired posting time (HH:MM format, 24-hour clock)
+
+        # Start scheduling the daily posting
+        schedule_posting(reddit, subreddit_name, post_time)
+
+    except Exception as e:
+        logging.critical(f"Critical failure: {e}")
